@@ -3,9 +3,9 @@ package cc.rome753.wat;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 
-import org.webrtc.AudioSource;
-import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
+import org.webrtc.DefaultVideoDecoderFactory;
+import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
@@ -36,14 +36,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        EglBase.Context eglBaseContext = EglBase.create().getEglBaseContext();
 
         // create PeerConnectionFactory
-        PeerConnectionFactory.InitializationOptions initializationOptions =
-                PeerConnectionFactory.InitializationOptions.builder(this).createInitializationOptions();
-        PeerConnectionFactory.initialize(initializationOptions);
-        peerConnectionFactory = PeerConnectionFactory.builder().createPeerConnectionFactory();
+        PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions
+                .builder(this)
+                .createInitializationOptions());
+        PeerConnectionFactory.Options options = new PeerConnectionFactory.Options();
+        DefaultVideoEncoderFactory defaultVideoEncoderFactory =
+                new DefaultVideoEncoderFactory(eglBaseContext, true, true);
+        DefaultVideoDecoderFactory defaultVideoDecoderFactory =
+                new DefaultVideoDecoderFactory(eglBaseContext);
+        peerConnectionFactory = PeerConnectionFactory.builder()
+                .setOptions(options)
+                .setVideoEncoderFactory(defaultVideoEncoderFactory)
+                .setVideoDecoderFactory(defaultVideoDecoderFactory)
+                .createPeerConnectionFactory();
 
-        EglBase.Context eglBaseContext = EglBase.create().getEglBaseContext();
         SurfaceTextureHelper surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBaseContext);
         // create VideoCapturer
         VideoCapturer videoCapturer = createCameraCapturer(true);
@@ -57,14 +66,13 @@ public class MainActivity extends AppCompatActivity {
 
         // create VideoTrack
         VideoTrack videoTrack = peerConnectionFactory.createVideoTrack("100", videoSource);
-        // display in localView
+//        // display in localView
 //        videoTrack.addSink(localView);
 
 
 
 
-        EglBase.Context remoteEglBaseContext = EglBase.create().getEglBaseContext();
-        SurfaceTextureHelper remoteSurfaceTextureHelper = SurfaceTextureHelper.create("RemoteCaptureThread", remoteEglBaseContext);
+        SurfaceTextureHelper remoteSurfaceTextureHelper = SurfaceTextureHelper.create("RemoteCaptureThread", eglBaseContext);
         // create VideoCapturer
         VideoCapturer remoteVideoCapturer = createCameraCapturer(false);
         VideoSource remoteVideoSource = peerConnectionFactory.createVideoSource(remoteVideoCapturer.isScreencast());
@@ -73,11 +81,11 @@ public class MainActivity extends AppCompatActivity {
 
         remoteView = findViewById(R.id.remoteView);
         remoteView.setMirror(false);
-        remoteView.init(remoteEglBaseContext, null);
+        remoteView.init(eglBaseContext, null);
 
         // create VideoTrack
         VideoTrack remoteVideoTrack = peerConnectionFactory.createVideoTrack("102", remoteVideoSource);
-//        // display in localView
+//        // display in remoteView
 //        remoteVideoTrack.addSink(remoteView);
 
 
@@ -128,11 +136,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-        //create sdpConstraints
-        MediaConstraints sdpConstraints = new MediaConstraints();
-        sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("offerToReceiveAudio", "true"));
-
         peerConnectionLocal.addStream(localMediaStream);
         peerConnectionLocal.createOffer(new SdpAdapter("local offer sdp") {
             @Override
@@ -151,9 +154,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }, new MediaConstraints());
             }
-        }, sdpConstraints);
+        }, new MediaConstraints());
     }
-
 
     private VideoCapturer createCameraCapturer(boolean isFront) {
         Camera1Enumerator enumerator = new Camera1Enumerator(false);
