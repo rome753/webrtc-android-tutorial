@@ -15,7 +15,7 @@ public class SdpAdapter implements SdpObserver {
     private String tag;
 
     public SdpAdapter(String tag) {
-        this.tag = tag;
+        this.tag = "chao " + tag;
     }
 
     private void log(String s) {

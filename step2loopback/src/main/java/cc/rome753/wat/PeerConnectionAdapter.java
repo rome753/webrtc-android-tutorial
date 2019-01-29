@@ -17,7 +17,7 @@ public class PeerConnectionAdapter implements PeerConnection.Observer {
     private String tag;
 
     public PeerConnectionAdapter(String tag) {
-        this.tag = tag;
+        this.tag = "chao " + tag;
     }
 
     private void log(String s) {
