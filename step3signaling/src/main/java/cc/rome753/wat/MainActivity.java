@@ -3,6 +3,7 @@ package cc.rome753.wat;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 
+import org.json.JSONObject;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
@@ -22,15 +23,13 @@ import org.webrtc.VideoTrack;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SignalingClient.Callback {
 
     PeerConnectionFactory peerConnectionFactory;
-    PeerConnection peerConnectionLocal;
-    PeerConnection peerConnectionRemote;
+    PeerConnection peerConnection;
     SurfaceViewRenderer localView;
     SurfaceViewRenderer remoteView;
-    MediaStream mediaStreamLocal;
-    MediaStream mediaStreamRemote;
+    MediaStream mediaStream;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,46 +66,31 @@ public class MainActivity extends AppCompatActivity {
         // create VideoTrack
         VideoTrack videoTrack = peerConnectionFactory.createVideoTrack("100", videoSource);
 //        // display in localView
-//        videoTrack.addSink(localView);
+        videoTrack.addSink(localView);
 
-
-
-
-        SurfaceTextureHelper remoteSurfaceTextureHelper = SurfaceTextureHelper.create("RemoteCaptureThread", eglBaseContext);
-        // create VideoCapturer
-        VideoCapturer remoteVideoCapturer = createCameraCapturer(false);
-        VideoSource remoteVideoSource = peerConnectionFactory.createVideoSource(remoteVideoCapturer.isScreencast());
-        remoteVideoCapturer.initialize(remoteSurfaceTextureHelper, getApplicationContext(), remoteVideoSource.getCapturerObserver());
-        remoteVideoCapturer.startCapture(480, 640, 30);
 
         remoteView = findViewById(R.id.remoteView);
         remoteView.setMirror(false);
         remoteView.init(eglBaseContext, null);
 
-        // create VideoTrack
-        VideoTrack remoteVideoTrack = peerConnectionFactory.createVideoTrack("102", remoteVideoSource);
-//        // display in remoteView
-//        remoteVideoTrack.addSink(remoteView);
 
 
+        mediaStream = peerConnectionFactory.createLocalMediaStream("mediaStream");
+        mediaStream.addTrack(videoTrack);
 
-        mediaStreamLocal = peerConnectionFactory.createLocalMediaStream("mediaStreamLocal");
-        mediaStreamLocal.addTrack(videoTrack);
-
-        mediaStreamRemote = peerConnectionFactory.createLocalMediaStream("mediaStreamRemote");
-        mediaStreamRemote.addTrack(remoteVideoTrack);
-
-        call(mediaStreamLocal, mediaStreamRemote);
+        SignalingClient.get().setCallback(this);
+        call();
     }
 
 
-    private void call(MediaStream localMediaStream, MediaStream remoteMediaStream) {
+    private void call() {
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
-        peerConnectionLocal = peerConnectionFactory.createPeerConnection(iceServers, new PeerConnectionAdapter("localconnection") {
+        iceServers.add(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer());
+        peerConnection = peerConnectionFactory.createPeerConnection(iceServers, new PeerConnectionAdapter("localconnection") {
             @Override
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
-                peerConnectionRemote.addIceCandidate(iceCandidate);
+                SignalingClient.get().sendIceCandidate(iceCandidate);
             }
 
             @Override
@@ -114,47 +98,12 @@ public class MainActivity extends AppCompatActivity {
                 super.onAddStream(mediaStream);
                 VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
                 runOnUiThread(() -> {
-                    remoteVideoTrack.addSink(localView);
+                    remoteVideoTrack.addSink(remoteView);
                 });
             }
         });
 
-        peerConnectionRemote = peerConnectionFactory.createPeerConnection(iceServers, new PeerConnectionAdapter("remoteconnection") {
-            @Override
-            public void onIceCandidate(IceCandidate iceCandidate) {
-                super.onIceCandidate(iceCandidate);
-                peerConnectionLocal.addIceCandidate(iceCandidate);
-            }
-
-            @Override
-            public void onAddStream(MediaStream mediaStream) {
-                super.onAddStream(mediaStream);
-                VideoTrack localVideoTrack = mediaStream.videoTracks.get(0);
-                runOnUiThread(() -> {
-                    localVideoTrack.addSink(remoteView);
-                });
-            }
-        });
-
-        peerConnectionLocal.addStream(localMediaStream);
-        peerConnectionLocal.createOffer(new SdpAdapter("local offer sdp") {
-            @Override
-            public void onCreateSuccess(SessionDescription sessionDescription) {
-                super.onCreateSuccess(sessionDescription);
-                // todo crashed here
-                peerConnectionLocal.setLocalDescription(new SdpAdapter("local set local"), sessionDescription);
-                peerConnectionRemote.addStream(remoteMediaStream);
-                peerConnectionRemote.setRemoteDescription(new SdpAdapter("remote set remote"), sessionDescription);
-                peerConnectionRemote.createAnswer(new SdpAdapter("remote answer sdp") {
-                    @Override
-                    public void onCreateSuccess(SessionDescription sdp) {
-                        super.onCreateSuccess(sdp);
-                        peerConnectionRemote.setLocalDescription(new SdpAdapter("remote set local"), sdp);
-                        peerConnectionLocal.setRemoteDescription(new SdpAdapter("local set remote"), sdp);
-                    }
-                }, new MediaConstraints());
-            }
-        }, new MediaConstraints());
+        peerConnection.addStream(mediaStream);
     }
 
     private VideoCapturer createCameraCapturer(boolean isFront) {
@@ -175,4 +124,62 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+    @Override
+    public void onCreateRoom() {
+
+    }
+
+    @Override
+    public void onPeerJoined() {
+
+    }
+
+    @Override
+    public void onSelfJoined() {
+        peerConnection.createOffer(new SdpAdapter("local offer sdp") {
+            @Override
+            public void onCreateSuccess(SessionDescription sessionDescription) {
+                super.onCreateSuccess(sessionDescription);
+                peerConnection.setLocalDescription(new SdpAdapter("local set local"), sessionDescription);
+                SignalingClient.get().sendSessionDescription(sessionDescription);
+            }
+        }, new MediaConstraints());
+    }
+
+    @Override
+    public void onPeerLeave(String msg) {
+
+    }
+
+    @Override
+    public void onOfferReceived(JSONObject data) {
+        runOnUiThread(() -> {
+            peerConnection.setRemoteDescription(new SdpAdapter("localSetRemote"),
+                    new SessionDescription(SessionDescription.Type.OFFER, data.optString("sdp")));
+            peerConnection.createAnswer(new SdpAdapter("localAnswerSdp") {
+                @Override
+                public void onCreateSuccess(SessionDescription sdp) {
+                    super.onCreateSuccess(sdp);
+                    peerConnection.setLocalDescription(new SdpAdapter("localSetLocal"), sdp);
+                    SignalingClient.get().sendSessionDescription(sdp);
+                }
+            }, new MediaConstraints());
+
+        });
+    }
+
+    @Override
+    public void onAnswerReceived(JSONObject data) {
+        peerConnection.setRemoteDescription(new SdpAdapter("localSetRemote"),
+                new SessionDescription(SessionDescription.Type.ANSWER, data.optString("sdp")));
+    }
+
+    @Override
+    public void onIceCandidateReceived(JSONObject data) {
+        peerConnection.addIceCandidate(new IceCandidate(
+                data.optString("id"),
+                data.optInt("label"),
+                data.optString("candidate")
+        ));
+    }
 }
