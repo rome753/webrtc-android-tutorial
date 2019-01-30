@@ -1,1 +1,1 @@
-include ':step1camera', ':step2loopback'
+include ':step1camera', ':step2loopback', 'step3signaling'

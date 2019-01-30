@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/step1camera/step1camera.iml" filepath="$PROJECT_DIR$/step1camera/step1camera.iml" />
       <module fileurl="file://$PROJECT_DIR$/step2loopback/step2loopback.iml" filepath="$PROJECT_DIR$/step2loopback/step2loopback.iml" />
+      <module fileurl="file://$PROJECT_DIR$/step3signaling/step3signaling.iml" filepath="$PROJECT_DIR$/step3signaling/step3signaling.iml" />
       <module fileurl="file://$PROJECT_DIR$/webrtc-android-tutorial.iml" filepath="$PROJECT_DIR$/webrtc-android-tutorial.iml" />
     </modules>
   </component>
