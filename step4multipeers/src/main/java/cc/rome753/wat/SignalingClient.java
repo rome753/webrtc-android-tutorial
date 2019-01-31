@@ -29,9 +29,7 @@ import io.socket.client.Socket;
 public class SignalingClient {
 
     private static SignalingClient instance;
-    private SignalingClient(){
-        init();
-    }
+    private SignalingClient(){}
     public static SignalingClient get() {
         if(instance == null) {
             synchronized (SignalingClient.class) {
@@ -66,11 +64,8 @@ public class SignalingClient {
             }
     };
 
-    public void setCallback(Callback callback) {
+    public void init(Callback callback) {
         this.callback = callback;
-    }
-
-    private void init() {
         try {
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, trustAll, null);
@@ -83,18 +78,18 @@ public class SignalingClient {
             socket.emit("create or join", room);
 
             socket.on("created", args -> {
-                Log.e("chao", "room created");
+                Log.e("chao", "room created:" + socket.id());
                 callback.onCreateRoom();
             });
             socket.on("full", args -> {
                 Log.e("chao", "room full");
             });
             socket.on("join", args -> {
-                Log.e("chao", "peer joined");
-                callback.onPeerJoined();
+                Log.e("chao", "peer joined " + Arrays.toString(args));
+                callback.onPeerJoined(String.valueOf(args[1]));
             });
             socket.on("joined", args -> {
-                Log.e("chao", "self joined");
+                Log.e("chao", "self joined:" + socket.id());
                 callback.onSelfJoined();
             });
             socket.on("log", args -> {
@@ -121,7 +116,6 @@ public class SignalingClient {
                     }
                 }
             });
-
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (KeyManagementException e) {
@@ -131,13 +125,22 @@ public class SignalingClient {
         }
     }
 
-    public void sendIceCandidate(IceCandidate iceCandidate) {
+    public void destroy() {
+        socket.emit("bye", socket.id());
+        socket.disconnect();
+        socket.close();
+        instance = null;
+    }
+
+    public void sendIceCandidate(IceCandidate iceCandidate, String to) {
         JSONObject jo = new JSONObject();
         try {
             jo.put("type", "candidate");
             jo.put("label", iceCandidate.sdpMLineIndex);
             jo.put("id", iceCandidate.sdpMid);
             jo.put("candidate", iceCandidate.sdp);
+            jo.put("from", socket.id());
+            jo.put("to", to);
 
             socket.emit("message", jo);
         } catch (JSONException e) {
@@ -145,12 +148,13 @@ public class SignalingClient {
         }
     }
 
-    public void sendSessionDescription(SessionDescription sdp) {
+    public void sendSessionDescription(SessionDescription sdp, String to) {
         JSONObject jo = new JSONObject();
         try {
             jo.put("type", sdp.type.canonicalForm());
             jo.put("sdp", sdp.description);
-
+            jo.put("from", socket.id());
+            jo.put("to", to);
             socket.emit("message", jo);
         } catch (JSONException e) {
             e.printStackTrace();
@@ -159,7 +163,7 @@ public class SignalingClient {
 
     public interface Callback {
         void onCreateRoom();
-        void onPeerJoined();
+        void onPeerJoined(String socketId);
         void onSelfJoined();
         void onPeerLeave(String msg);
 
