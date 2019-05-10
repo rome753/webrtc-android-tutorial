@@ -1,1 +1,1 @@
-include ':step1camera', ':step2loopback', 'step3signaling', 'step4multipeers'
+include ':step1camera', ':step2loopback', ':webrtc', 'step3signaling', 'step4multipeers'

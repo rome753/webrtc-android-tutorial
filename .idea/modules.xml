@@ -6,6 +6,7 @@
       <module fileurl="file://$PROJECT_DIR$/step2loopback/step2loopback.iml" filepath="$PROJECT_DIR$/step2loopback/step2loopback.iml" />
       <module fileurl="file://$PROJECT_DIR$/step3signaling/step3signaling.iml" filepath="$PROJECT_DIR$/step3signaling/step3signaling.iml" />
       <module fileurl="file://$PROJECT_DIR$/step4multipeers/step4multipeers.iml" filepath="$PROJECT_DIR$/step4multipeers/step4multipeers.iml" />
+      <module fileurl="file://$PROJECT_DIR$/webrtc/webrtc.iml" filepath="$PROJECT_DIR$/webrtc/webrtc.iml" />
       <module fileurl="file://$PROJECT_DIR$/webrtc-android-tutorial.iml" filepath="$PROJECT_DIR$/webrtc-android-tutorial.iml" />
     </modules>
   </component>
