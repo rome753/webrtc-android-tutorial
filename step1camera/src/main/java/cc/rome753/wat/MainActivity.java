@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
         localView.init(eglBaseContext, null);
 
         // create VideoTrack
-        VideoTrack videoTrack = peerConnectionFactory.createVideoTrack("101", videoSource);
+        VideoTrack videoTrack = peerConnectionFactory.createVideoTrack("100", videoSource);
         // display in localView
         videoTrack.addSink(localView);
     }
